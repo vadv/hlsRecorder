@@ -34,7 +34,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 	wasStopped := false
 	go func() {
 
-		prevMediaSEQ := int64(-1)
+		prevChunkMediaSEQ, prevIframeMediaSEQ := int64(-1), int64(-1)
 		equalMediaSEQCount := 0
 
 		//var dataOffset indexOffset int64
@@ -63,20 +63,23 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			}
 			chunkPL.SetURL(mainURL)
 
-			if chunkPL.MediaSeq < prevMediaSEQ {
-				log.Printf("[ERROR] {stream: %s} текущий media sequence меньше чем предыдущий: текущий=%d предыдущий=%d\n", mainURI, chunkPL.MediaSeq, prevMediaSEQ)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			if chunkPL.MediaSeq == prevMediaSEQ {
+			/*
+				MediaSeq в памяти транскодера - поэтому мы не можем на него орентироваться
+					if chunkPL.MediaSeq < prevChunkMediaSEQ {
+						log.Printf("[ERROR] {stream: %s} текущий media sequence меньше чем предыдущий: текущий=%d предыдущий=%d\n", mainURI, chunkPL.MediaSeq, prevChunkMediaSEQ)
+						time.Sleep(5 * time.Second)
+						continue
+					}
+			*/
+			if chunkPL.MediaSeq == prevChunkMediaSEQ {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
-					log.Printf("[ERROR] {stream: %s} media sequence не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
+					log.Printf("[ERROR] {stream: %s} media sequence в chunks не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
 				continue
 			}
-			equalMediaSEQCount = 0
+			equalMediaSEQCount, prevChunkMediaSEQ = 0, chunkPL.MediaSeq
 
 			// обработка iframe плейлиста
 			r2, err := fetchURL(iframeURI, nil)
@@ -96,6 +99,23 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 				log.Printf("[ERROR] {stream: %s} проблема с iframe-плейлистом %s: это не iframe-плейлист\n", mainURI, iframeURI)
 			}
 			iframePL.SetURL(iframeURL)
+
+			if iframePL.MediaSeq == prevIframeMediaSEQ {
+				equalMediaSEQCount++
+				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
+					log.Printf("[ERROR] {stream: %s} media sequence в iframes не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
+				}
+				time.Sleep(time.Second)
+				continue
+			}
+			equalMediaSEQCount, prevIframeMediaSEQ = 0, iframePL.MediaSeq
+
+			/*
+				if iframePL.MediaSeq < chunkPL.MediaSeq {
+					log.Printf("[ERROR] {stream: %s} media sequence iframes %d < chunks %d\n", mainURI, iframePL.MediaSeq, chunkPL.MediaSeq)
+					continue
+				}
+			*/
 
 			minutes, err := makeMinutes(chunkPL.Segments, iframePL.Segments)
 			if err != nil {

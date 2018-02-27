@@ -45,3 +45,9 @@ func (s *Segment) ToString() string {
 		return fmt.Sprintf("%s", url)
 	}
 }
+
+// http-хидер
+func (b *ByteRange) Range() string {
+	return fmt.Sprintf(
+		"bytes=%d-%d", b.Offset, b.Offset+b.Length-1)
+}

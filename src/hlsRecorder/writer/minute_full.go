@@ -74,8 +74,7 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 	chunkLength, chunkOffset := len(m.chunks), int64(0)
 	for i, s := range m.chunks {
 		if s.ByteRange != nil {
-			headersRange["Range"] = fmt.Sprintf(
-				"bytes=%d-%d", s.ByteRange.Offset, s.ByteRange.Offset+s.ByteRange.Length-1)
+			headersRange["Range"] = s.ByteRange.Range()
 			headers = headersRange
 		}
 		http, err := fetchURLWithRetry(s.URL, headers, 3)
@@ -88,18 +87,23 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 			return err
 		}
-		if i == chunkLength-1 {
-			// записываем CHUNK OEF
-			index.ChunkEOF(chunkOffset+writeSize, 0, s.BeginAt-float64(m.beginAt))
-		} else {
-			// обычный CHUNK
-			index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
-		}
+		// обычный CHUNK
+		index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
 		if err := index.Write(indexFD); err != nil {
 			return err
 		}
 		if err := indexFD.Sync(); err != nil {
 			return err
+		}
+		if i == chunkLength-1 {
+			// записываем CHUNK OEF
+			index.ChunkEOF(chunkOffset+writeSize, 0, s.EndAt-float64(m.beginAt))
+			if err := index.Write(indexFD); err != nil {
+				return err
+			}
+			if err := indexFD.Sync(); err != nil {
+				return err
+			}
 		}
 		headers = nil
 		chunkOffset = chunkOffset + writeSize
@@ -110,8 +114,7 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 	iframeLength, iframeOffset := len(m.iframes), int64(0)
 	for i, s := range m.iframes {
 		if s.ByteRange != nil {
-			headersRange["Range"] = fmt.Sprintf(
-				"bytes=%d-%d", s.ByteRange.Offset, s.ByteRange.Offset+s.ByteRange.Length-1)
+			headersRange["Range"] = s.ByteRange.Range()
 			headers = headersRange
 		}
 		http, err := fetchURLWithRetry(s.URL, headers, 3)
@@ -124,18 +127,23 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 			return err
 		}
-		if i == iframeLength-1 {
-			// записываем IFRAME OEF
-			index.IFrameEOF(iframeOffset+writeSize, 0, s.BeginAt-float64(m.beginAt))
-		} else {
-			// записываем IFRAME
-			index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
-		}
+		// записываем IFRAME
+		index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
 		if err := index.Write(indexFD); err != nil {
 			return err
 		}
 		if err := indexFD.Sync(); err != nil {
 			return err
+		}
+		if i == iframeLength-1 {
+			// записываем IFRAME OEF
+			index.IFrameEOF(iframeOffset+writeSize, 0, s.EndAt-float64(m.beginAt))
+			if err := index.Write(indexFD); err != nil {
+				return err
+			}
+			if err := indexFD.Sync(); err != nil {
+				return err
+			}
 		}
 		headers = nil
 		iframeOffset = iframeOffset + writeSize

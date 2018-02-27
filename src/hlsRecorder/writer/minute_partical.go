@@ -112,11 +112,10 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	chunkLength := len(m.chunks)
 	// проверяем что дописать по chunks
 	for i, s := range m.chunks {
-		if round(s.BeginAt-float64(m.beginAt)) > round(lastChunk.TimeStampInSec()) {
+		if round(s.BeginAt-float64(m.beginAt)) > round(lastChunk.TimeStampInSec()+0.1) {
 			index := &hedx.Index{}
 			if s.ByteRange != nil {
-				headersRange["Range"] = fmt.Sprintf(
-					"bytes=%d-%d", s.ByteRange.Offset, s.ByteRange.Offset+s.ByteRange.Length-1)
+				headersRange["Range"] = s.ByteRange.Range()
 				headers = headersRange
 			}
 			http, err := fetchURLWithRetry(s.URL, headers, 3)
@@ -129,18 +128,24 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last
 			}
-			if m.full && i == chunkLength-1 {
-				// записываем CHUNK OEF
-				index.ChunkEOF(chunkOffset+writeSize, 0, s.BeginAt-float64(m.beginAt))
-			} else {
-				// обычный CHUNK
-				index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
-			}
+			// обычный CHUNK
+			index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
 			if err := index.Write(indexFD); err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
 			if err := indexFD.Sync(); err != nil {
 				return err, chunkWrited, iframeWrited, last
+			}
+			// записываем CHUNK OEF
+			if m.full && i == chunkLength-1 {
+				index.ChunkEOF(chunkOffset+writeSize, 0, s.EndAt-float64(m.beginAt))
+				if err := index.Write(indexFD); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
+				if err := indexFD.Sync(); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
+				chunkWrited++
 			}
 			headers = nil
 			chunkOffset = chunkOffset + writeSize
@@ -161,11 +166,10 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	iframeLength := len(m.iframes)
 	// проверяем что дописать по iframes
 	for i, s := range m.iframes {
-		if round(s.BeginAt-float64(m.beginAt)) > round(lastIFrame.TimeStampInSec()) {
+		if round(s.BeginAt-float64(m.beginAt)) > round(lastIFrame.TimeStampInSec()+0.1) {
 			index := &hedx.Index{}
 			if s.ByteRange != nil {
-				headersRange["Range"] = fmt.Sprintf(
-					"bytes=%d-%d", s.ByteRange.Offset, s.ByteRange.Offset+s.ByteRange.Length-1)
+				headersRange["Range"] = s.ByteRange.Range()
 				headers = headersRange
 			}
 			http, err := fetchURLWithRetry(s.URL, headers, 3)
@@ -178,18 +182,23 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last
 			}
-			if m.full && i == iframeLength-1 {
-				// записываем IFRAME OEF
-				index.IFrameEOF(iframeOffset+writeSize, 0, s.BeginAt-float64(m.beginAt))
-			} else {
-				// обычный IFRAME
-				index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
-			}
+			// обычный IFRAME
+			index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
 			if err := index.Write(indexFD); err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
 			if err := indexFD.Sync(); err != nil {
 				return err, chunkWrited, iframeWrited, last
+			}
+			// записываем IFRAME OEF
+			if m.full && i == iframeLength-1 {
+				index.IFrameEOF(iframeOffset+writeSize, 0, s.BeginAt-float64(m.beginAt))
+				if err := index.Write(indexFD); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
+				if err := indexFD.Sync(); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
 			}
 			headers = nil
 			iframeOffset = iframeOffset + writeSize

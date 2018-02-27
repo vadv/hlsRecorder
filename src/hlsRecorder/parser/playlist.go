@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+func round(f float64) float64 {
+	return float64(int64(f*100)) / 100
+}
+
 func timeToFloat64(t time.Time) float64 {
 	return float64(t.UnixNano()) / float64(time.Second)
 }
@@ -144,6 +148,11 @@ func ParsePlayList(r io.ReadCloser) (*PlayList, error) {
 	}
 	if err := scanner.Err(); err != nil {
 		return &result, err
+	}
+	for _, s := range result.Segments {
+		s.BeginAt = round(s.BeginAt)
+		s.EndAt = round(s.EndAt)
+		s.Duration = round(s.Duration)
 	}
 	return &result, nil
 }

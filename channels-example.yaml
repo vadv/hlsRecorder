@@ -1,0 +1,16 @@
+CH_TV1HDREC:
+  bw700000:
+    chunks:  http://192.168.185.148/indextest/0/chunklist.m3u8
+    iframes: http://192.168.185.148/indextest/0/iframe_chunklist.m3u8
+  bw1500000:
+    chunks:  http://192.168.185.148/indextest/1/chunklist.m3u8
+    iframes: http://192.168.185.148/indextest/1/iframe_chunklist.m3u8
+  bw2000000:
+    chunks:  http://192.168.185.148/indextest/2/chunklist.m3u8
+    iframes: http://192.168.185.148/indextest/2/iframe_chunklist.m3u8
+  bw4000000:
+    chunks:  http://192.168.185.148/indextest/3/chunklist.m3u8
+    iframes: http://192.168.185.148/indextest/3/iframe_chunklist.m3u8
+  bw5000000:
+    chunks:  http://192.168.185.148/indextest/4/chunklist.m3u8
+    iframes: http://192.168.185.148/indextest/4/iframe_chunklist.m3u8

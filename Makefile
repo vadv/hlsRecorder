@@ -11,7 +11,7 @@ GOPATH := ${CURDIR}:${GOPATH}
 export GOPATH
 
 $(BINARY): $(SOURCES)
-	go build -o ${BINARY} -ldflags "-X main.BuildVersion=$(VERSION)-$(SHA)" $(SOURCEDIR)/${NAME}/cmd/main.go
+	go build -o ${BINARY} -ldflags "-X main.BuildVersion=$(VERSION)-$(SHA)" $(SOURCEDIR)/${NAME}/cmd
 
 run: clean $(BINARY)
 	${BINARY}

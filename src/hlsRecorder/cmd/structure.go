@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	keys "hlsRecorder/keys"
@@ -39,6 +40,7 @@ func (c *Channel) Start(vmx *keys.VMX) {
 	c.cancelFunc = f
 
 	writer.Stream(&parser.Stream{
+		LogName:   fmt.Sprintf("%s-%s", c.Resource, c.BW),
 		MainURI:   c.Stream.MainURI,
 		IFrameURI: c.Stream.IFrameURI,
 	}, ctx)

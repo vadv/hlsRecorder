@@ -21,6 +21,8 @@ func main() {
 		flag.Parse()
 	}
 
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
 	channels, err := channelParser(*flagChannels)
 	if err != nil {
 		log.Printf("[FATAL] при парсинге конфига %s: %s\n", *flagChannels, err.Error())

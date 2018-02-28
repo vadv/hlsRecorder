@@ -7,10 +7,15 @@ type Index struct {
 }
 
 type Stream struct {
+	LogName       string
 	Resolution    string
 	MainBandwidth string
 	MainURI       string
 	IFrameURI     string
+}
+
+func (s *Stream) Name() string {
+	return fmt.Sprintf("{ %s }", s.LogName)
 }
 
 type PlayList struct {

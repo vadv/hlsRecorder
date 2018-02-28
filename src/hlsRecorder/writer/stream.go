@@ -17,8 +17,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 	indexDir := (ctx.Value(`path.index.dir`)).(string)
 	vmx := (ctx.Value(`keys.vmx`)).(*keys.VMX)
 
-	mainURI := stream.MainURI
-	iframeURI := stream.IFrameURI
+	mainURI, iframeURI := stream.MainURI, stream.IFrameURI
 	mainURL, errMainURL := url.Parse(stream.MainURI)
 	iframeURL, errIFrameURL := url.Parse(stream.IFrameURI)
 	if errMainURL != nil {
@@ -28,7 +27,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 		panic(errIFrameURL)
 	}
 
-	log.Printf("[INFO] {stream: %s} старт процессинга с параметрами: storage=`%s`, index=`%s`\n", mainURI, storageDir, indexDir)
+	log.Printf("[INFO] %s старт процессинга с параметрами: storage=`%s`, index=`%s`\n", stream.Name(), storageDir, indexDir)
 
 	// запускаем бесконечный тред
 	wasStopped := false
@@ -50,14 +49,14 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			// обработка главного плейлиста
 			r1, err := fetchURL(mainURI, nil)
 			if err != nil {
-				log.Printf("[ERROR] {stream: %s} в процессе скачивания chunks-плейлиста: %s\n", mainURI, err.Error())
+				log.Printf("[ERROR] %s в процессе скачивания chunks-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			chunkPL, err := parser.ParsePlayList(r1)
 			r1.Close()
 			if err != nil {
-				log.Printf("[ERROR] {stream: %s} при парсинге chunk-плейлиста: %s\n", mainURI, err.Error())
+				log.Printf("[ERROR] %s при парсинге chunk-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -66,7 +65,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			/*
 				MediaSeq в памяти транскодера - поэтому мы не можем на него орентироваться
 					if chunkPL.MediaSeq < prevChunkMediaSEQ {
-						log.Printf("[ERROR] {stream: %s} текущий media sequence меньше чем предыдущий: текущий=%d предыдущий=%d\n", mainURI, chunkPL.MediaSeq, prevChunkMediaSEQ)
+						log.Printf("[ERROR] % текущий media sequence меньше чем предыдущий: текущий=%d предыдущий=%d\n", mainURI, chunkPL.MediaSeq, prevChunkMediaSEQ)
 						time.Sleep(5 * time.Second)
 						continue
 					}
@@ -74,7 +73,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			if chunkPL.MediaSeq == prevChunkMediaSEQ {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
-					log.Printf("[ERROR] {stream: %s} media sequence в chunks не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
+					log.Printf("[ERROR] %s media sequence в chunks не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
 				continue
@@ -84,26 +83,26 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			// обработка iframe плейлиста
 			r2, err := fetchURL(iframeURI, nil)
 			if err != nil {
-				log.Printf("[ERROR] {stream: %s} в процессе скачивания iframe-плейлиста: %s\n", mainURI, err.Error())
+				log.Printf("[ERROR] %s в процессе скачивания iframe-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			iframePL, err := parser.ParsePlayList(r2)
 			r2.Close()
 			if err != nil {
-				log.Printf("[ERROR] {stream: %s} при парсинге iframe-плейлиста: %s\n", mainURI, err.Error())
+				log.Printf("[ERROR] %s при парсинге iframe-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			if !iframePL.IFrame {
-				log.Printf("[ERROR] {stream: %s} проблема с iframe-плейлистом %s: это не iframe-плейлист\n", mainURI, iframeURI)
+				log.Printf("[ERROR] %s проблема с iframe-плейлистом %s: это не iframe-плейлист\n", stream.Name(), iframeURI)
 			}
 			iframePL.SetURL(iframeURL)
 
 			if iframePL.MediaSeq == prevIframeMediaSEQ {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
-					log.Printf("[ERROR] {stream: %s} media sequence в iframes не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
+					log.Printf("[ERROR] %s media sequence в iframes не изменился за последние %d попыток\n", stream.Name(), equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
 				continue
@@ -112,14 +111,14 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 
 			/*
 				if iframePL.MediaSeq < chunkPL.MediaSeq {
-					log.Printf("[ERROR] {stream: %s} media sequence iframes %d < chunks %d\n", mainURI, iframePL.MediaSeq, chunkPL.MediaSeq)
+					log.Printf("[ERROR] % media sequence iframes %d < chunks %d\n", mainURI, iframePL.MediaSeq, chunkPL.MediaSeq)
 					continue
 				}
 			*/
 
 			minutes, err := makeMinutes(chunkPL, iframePL)
 			if err != nil {
-				log.Printf("[ERROR] {stream: %s} при создании плана минуток: %s\n", mainURI, err.Error())
+				log.Printf("[ERROR] %s при создании плана минуток: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -130,20 +129,21 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 					// необходимо записать минутку
 					if m.full && m.beginAt != lastMinute.beginAt {
 						// записываем минутку полностью
-						log.Printf("[INFO] {stream: %s} старт записи полной минуты %d\n", mainURI, m.beginAt)
+						log.Printf("[INFO] %s старт записи полной минуты %d\n", stream.Name(), m.beginAt)
 						if err := m.writeFull(indexDir, storageDir, resource, vmx); err != nil {
-							log.Printf("[ERROR] {stream: %s} запись полной минуты %d: %s\n", mainURI, m.beginAt, err.Error())
+							log.Printf("[ERROR] %s запись полной минуты %d: %s\n", stream.Name(), m.beginAt, err.Error())
 							continue
 						}
-						log.Printf("[INFO] {stream: %s} успешная запись полной минуты %d\n", mainURI, m.beginAt)
+						log.Printf("[INFO] %s успешная запись полной минуты %d\n", stream.Name(), m.beginAt)
 					} else {
 						err, chunks, iframes, last := m.writePartical(indexDir, storageDir, resource, vmx)
 						if err != nil {
-							log.Printf("[ERROR] {stream: %s} обработка минуты минуты %d: %s\n", mainURI, m.beginAt, err.Error())
+							log.Printf("[ERROR] %s обработка минуты минуты %d: %s\n", stream.Name(), m.beginAt, err.Error())
 							continue
 						}
 						if chunks+iframes > 0 {
-							log.Printf("[DEBUG] {stream: %s} обработка минуты %d было записано: [chunks:%d iframes:%d lag:%.2f]", mainURI, m.beginAt, chunks, iframes, float64(time.Now().Unix())-last)
+							log.Printf("[DEBUG] %s обработка минуты %d было записано: [chunks:%d iframes:%d lag:%.2f]",
+								stream.Name(), m.beginAt, chunks, iframes, (float64(time.Now().UnixNano())/float64(time.Second))-last)
 						}
 					}
 

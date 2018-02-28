@@ -11,10 +11,11 @@ import (
 
 // сущность - набор сегментом которые необходимо записать на диск
 type minute struct {
-	beginAt int64
-	full    bool
-	chunks  []*parser.Segment
-	iframes []*parser.Segment
+	beginAt       int64
+	full          bool
+	chunks        []*parser.Segment
+	iframes       []*parser.Segment
+	chunkPlayList *parser.PlayList
 }
 
 // важная функция - по сути прибитый гвозядями путь на диске
@@ -59,4 +60,9 @@ func (m *minute) indexHasEOF(indexDir string) bool {
 	}
 	defer fd.Close()
 	return hedx.HaveEOF(fd)
+}
+
+// ротейшен полиси ключа
+func (m *minute) KeyTime() int64 {
+	return (m.beginAt - (m.beginAt % (60 * 15))) // раз в 15 минут
 }

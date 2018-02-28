@@ -2,6 +2,7 @@ package writer
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -60,7 +61,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 
 	// параметры ключа
 	var keyData []byte
-	keyPosition := m.beginAt
+	keyPosition := m.KeyTime()
 
 	// в LastIndex мы передвигаемся до конца дескриптора
 	lastChunk, chunkKey, lastIFrame, iframeKey := hedx.LastIndexesWithKeys(indexFD)
@@ -69,7 +70,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	// если мы только открыли index и там нет ключей
 	if chunkKey.Type == hedx.TypeInvalid && iframeKey.Type == hedx.TypeInvalid {
 		// получаем их
-		newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.beginAt)
+		newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
 		if err != nil {
 			return err, chunkWrited, iframeWrited, last
 		}
@@ -110,9 +111,43 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	chunkOffset := stat.Size()
 
 	chunkLength := len(m.chunks)
+
 	// проверяем что дописать по chunks
 	for i, s := range m.chunks {
-		if round(s.BeginAt-float64(m.beginAt)) > round(lastChunk.TimeStampInSec()+0.1) {
+
+		// добавляем сообщение об ошибке + скачиваем подозрительные сегменты
+		if i > 1 && m.chunks[i].BeginAt-m.chunks[i-1].BeginAt != 3 {
+			log.Printf("[ERROR] <<<bad chunk>>> %s %s\n", s.ToString(), m.chunks[i-1].ToString())
+			log.Printf("[ERROR] playlist:\n%s\n", m.chunkPlayList.Body)
+			filename := filepath.Join(storageDir, s.URI)
+			http, err := fetchURL(filename, nil)
+			if err == nil {
+				defer http.Close()
+				fd, err := os.OpenFile(s.URI, os.O_RDWR|os.O_CREATE, 0644)
+				if err == nil {
+					defer fd.Close()
+					_, err := io.Copy(fd, http)
+					if err == nil {
+						log.Printf("[ERROR] current bad chunk: %s saved\n", s.URI)
+					}
+				}
+			}
+			http, err = fetchURL(m.chunks[i-1].URL, nil)
+			if err == nil {
+				defer http.Close()
+				filename := filepath.Join(storageDir, m.chunks[i-1].URI)
+				fd, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+				if err == nil {
+					defer fd.Close()
+					_, err := io.Copy(fd, http)
+					if err == nil {
+						log.Printf("[ERROR] prev bad chunk: %s saved\n", filename)
+					}
+				}
+			}
+		}
+
+		if round(s.BeginAt) > round(float64(m.beginAt)+lastChunk.TimeStampInSec()+0.1) {
 			index := &hedx.Index{}
 			if s.ByteRange != nil {
 				headersRange["Range"] = s.ByteRange.Range()
@@ -199,6 +234,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 				if err := indexFD.Sync(); err != nil {
 					return err, chunkWrited, iframeWrited, last
 				}
+				iframeWrited++
 			}
 			headers = nil
 			iframeOffset = iframeOffset + writeSize

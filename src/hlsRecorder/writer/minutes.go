@@ -11,19 +11,19 @@ type minutes struct {
 }
 
 // возвращаем список всех полных минуток из сегмента
-func makeMinutes(chunks, iframes []*parser.Segment) (*minutes, error) {
+func makeMinutes(chunks, iframes *parser.PlayList) (*minutes, error) {
 
-	if len(chunks) == 0 {
+	if len(chunks.Segments) == 0 {
 		return nil, fmt.Errorf("список chunk-сегментов пустой")
 	}
 
-	if len(iframes) == 0 {
+	if len(iframes.Segments) == 0 {
 		return nil, fmt.Errorf("список iframe-сегментов пустой")
 	}
 
 	list := make(map[int64]*minute, 0)
 
-	for _, segment := range chunks {
+	for _, segment := range chunks.Segments {
 		at := getMinute(segment.BeginAt)
 		if _, ok := list[at]; !ok {
 			list[at] = newMinute(segment.BeginAt)
@@ -31,7 +31,7 @@ func makeMinutes(chunks, iframes []*parser.Segment) (*minutes, error) {
 		list[at].chunks = append(list[at].chunks, segment)
 	}
 
-	for _, segment := range iframes {
+	for _, segment := range iframes.Segments {
 		at := getMinute(segment.BeginAt)
 		if _, ok := list[at]; !ok {
 			// iframe-плейлист обгоняет/не догоняет chunks
@@ -42,7 +42,7 @@ func makeMinutes(chunks, iframes []*parser.Segment) (*minutes, error) {
 
 	// первая минута всегда в непонятном статусе,
 	// поэтому мы просто ее удаляем
-	delete(list, getMinute(chunks[0].BeginAt))
+	delete(list, getMinute(chunks.Segments[0].BeginAt))
 	if len(list) == 0 {
 		return nil, fmt.Errorf("не одной целой минуты")
 	}
@@ -61,6 +61,7 @@ func makeMinutes(chunks, iframes []*parser.Segment) (*minutes, error) {
 				break
 			}
 		}
+		m.chunkPlayList = chunks
 		m.full = chunkFull && iframeFull
 	}
 

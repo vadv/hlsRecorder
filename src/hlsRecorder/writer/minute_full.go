@@ -57,7 +57,7 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 	headersRange, headers := make(map[string]string, 1), make(map[string]string, 0)
 
 	// должны записать ключи, сначала получаем их
-	keyData, keyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.beginAt)
+	keyData, keyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
 	if err != nil {
 		return err
 	}

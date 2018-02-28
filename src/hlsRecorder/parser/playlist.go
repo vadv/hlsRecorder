@@ -60,6 +60,8 @@ func ParsePlayList(r io.ReadCloser) (*PlayList, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		// для дебага
+		result.Body = fmt.Sprintf("%s\n%s", result.Body, line)
 		if len(line) < 1 {
 			continue
 		}

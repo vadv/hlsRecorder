@@ -18,6 +18,7 @@ type PlayList struct {
 	MediaSeq int64
 	IFrame   bool
 	Segments []*Segment
+	Body     string
 }
 
 type Segment struct {

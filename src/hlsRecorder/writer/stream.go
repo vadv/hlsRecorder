@@ -117,7 +117,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 				}
 			*/
 
-			minutes, err := makeMinutes(chunkPL.Segments, iframePL.Segments)
+			minutes, err := makeMinutes(chunkPL, iframePL)
 			if err != nil {
 				log.Printf("[ERROR] {stream: %s} при создании плана минуток: %s\n", mainURI, err.Error())
 				time.Sleep(5 * time.Second)

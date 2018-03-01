@@ -41,12 +41,12 @@ func New(rawurl string) *VMX {
 
 func (k *VMX) junitor() {
 	for {
-		k.RLock()
+		k.Lock()
 		if len(k.keyByURL) > 1024 {
 			k.keyByURL = make(map[string][]byte)
 			// ресурсов не так много по ожиданиям (кол-во каналов, так что их не чистим)
 		}
-		k.RUnlock()
+		k.Unlock()
 		time.Sleep(time.Minute)
 	}
 }

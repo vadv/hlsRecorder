@@ -25,10 +25,10 @@ func (k *VMX) GetKeyPosition(r string, t resourceType, p int64) ([]byte, int64, 
 	u.RawQuery = q.Encode()
 
 	// блокируем на чтение
-	k.Lock()
+	k.RLock()
 	// нашлось в кэше
 	result, ok := k.keyByURL[u.String()]
-	k.Unlock()
+	k.RUnlock()
 	if ok {
 		return result, p, nil
 	}
@@ -37,9 +37,9 @@ func (k *VMX) GetKeyPosition(r string, t resourceType, p int64) ([]byte, int64, 
 	http, err := fetchURLWithRetry(u.String(), 3)
 	if err != nil {
 		// мы не смогли получить ключ, пробуем достать по последнему ресурсу
-		k.Lock()
+		k.RLock()
 		result, p, err := k.getUnsafeKeyPosition(r)
-		k.Unlock()
+		k.RUnlock()
 		return result, p, err
 	}
 	defer http.Close()
@@ -48,17 +48,17 @@ func (k *VMX) GetKeyPosition(r string, t resourceType, p int64) ([]byte, int64, 
 	size, err := io.ReadFull(http, buff)
 	if err != nil || size != len(buff) {
 		// мы не смогли получить ключ, пробуем достать по последнему ресурсу
-		k.Lock()
+		k.RLock()
 		result, p, err := k.getUnsafeKeyPosition(r)
-		k.Unlock()
+		k.RUnlock()
 		return result, p, err
 	}
 
-	k.RLock()
+	k.Lock()
 	k.keyByURL[u.String()] = buff
 	k.lastKeyByResource[r] = buff
 	k.lastPositionByResource[r] = p
-	k.RUnlock()
+	k.Unlock()
 
 	return buff, p, nil
 }

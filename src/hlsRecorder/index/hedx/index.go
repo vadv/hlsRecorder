@@ -19,9 +19,9 @@ const (
 	TypeKey = 3
 	// TypeEOF конец файла или chunk
 	TypeEOF = 4
-	// TypeDiscontinuity discontinuity, который вставил smartrecord
+	// TypeDiscontinuity discontinuity
 	TypeDiscontinuity = 5
-	// TypeNoSignal - если в промежуток определенного времени smartrecord не получал сигнал
+	// TypeNoSignal - если в промежуток определенного времени не получали сигнал
 	TypeNoSignal       = 6
 	inIframeFlag uint8 = 0x01
 )

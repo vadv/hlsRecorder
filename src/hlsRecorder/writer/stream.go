@@ -15,7 +15,13 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 	resource := (ctx.Value(`content.channel`)).(string)
 	storageDir := (ctx.Value(`path.storage.dir`)).(string)
 	indexDir := (ctx.Value(`path.index.dir`)).(string)
-	vmx := (ctx.Value(`keys.vmx`)).(*keys.VMX)
+	deleteOlder := (ctx.Value(`path.delete_older`).(int64))
+
+	vmx, ok := (ctx.Value(`keys.vmx`)).(*keys.VMX)
+	if !ok {
+		// отключаем шифрование
+		vmx = nil
+	}
 
 	mainURI, iframeURI := stream.MainURI, stream.IFrameURI
 	mainURL, errMainURL := url.Parse(stream.MainURI)
@@ -27,7 +33,10 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 		panic(errIFrameURL)
 	}
 
-	log.Printf("[INFO] %s старт процессинга с параметрами: storage=`%s`, index=`%s`\n", stream.Name(), storageDir, indexDir)
+	go runJunitor(storageDir, deleteOlder)
+	go runJunitor(indexDir, deleteOlder)
+
+	log.Printf("[INFO] %s старт процессинга с параметрами: storage=`%s`, index=`%s`, vmx=`%v`\n", stream.Name(), storageDir, indexDir, vmx != nil)
 
 	// запускаем бесконечный тред
 	wasStopped := false
@@ -35,8 +44,6 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 
 		prevChunkMediaSEQ, prevIframeMediaSEQ := int64(-1), int64(-1)
 		equalMediaSEQCount := 0
-
-		//var dataOffset indexOffset int64
 
 		// каждый цикл мы должны должны скачать главный плейлист
 		// пробежаться по нему сверху до низу:
@@ -63,7 +70,8 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			chunkPL.SetURL(mainURL)
 
 			/*
-				MediaSeq в памяти транскодера - поэтому мы не можем на него орентироваться
+				// MediaSeq в памяти транскодера - поэтому мы не можем на него орентироваться
+				// но необходимо создавать discontinuity
 					if chunkPL.MediaSeq < prevChunkMediaSEQ {
 						log.Printf("[ERROR] % текущий media sequence меньше чем предыдущий: текущий=%d предыдущий=%d\n", mainURI, chunkPL.MediaSeq, prevChunkMediaSEQ)
 						time.Sleep(5 * time.Second)
@@ -124,7 +132,8 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			}
 
 			lastMinute := minutes.last()
-			for _, m := range minutes.list {
+			for _, min := range minutes.sortedMinuteList() {
+				m := minutes.list[min]
 				if !m.indexHasEOF(indexDir) {
 					// необходимо записать минутку
 					if m.full && m.beginAt != lastMinute.beginAt {

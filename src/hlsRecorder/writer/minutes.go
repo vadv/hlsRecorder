@@ -2,6 +2,7 @@ package writer
 
 import (
 	"fmt"
+	"sort"
 
 	parser "hlsRecorder/parser"
 )
@@ -75,4 +76,13 @@ func (m *minutes) last() (last *minute) {
 		}
 	}
 	return
+}
+
+func (m *minutes) sortedMinuteList() []int64 {
+	result := make([]int64, 0)
+	for i, _ := range m.list {
+		result = append(result, i)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
 }

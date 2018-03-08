@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 var (
@@ -23,7 +24,7 @@ func main() {
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	channels, err := channelParser(*flagChannels)
+	channels, err := channelConfigParser(*flagChannels)
 	if err != nil {
 		log.Printf("[FATAL] при парсинге конфига %s: %s\n", *flagChannels, err.Error())
 		os.Exit(1)
@@ -45,5 +46,6 @@ func main() {
 
 	<-halt
 	config.Stop()
+	time.Sleep(5 * time.Second)
 	os.Exit(1)
 }

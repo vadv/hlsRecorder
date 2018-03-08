@@ -67,40 +67,42 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	lastChunk, chunkKey, lastIFrame, iframeKey := hedx.LastIndexesWithKeys(indexFD)
 
 	// разбираемся с ключами
-	// если мы только открыли index и там нет ключей
-	if chunkKey.Type == hedx.TypeInvalid && iframeKey.Type == hedx.TypeInvalid {
-		// получаем их
-		newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
-		if err != nil {
-			return err, chunkWrited, iframeWrited, last
-		}
-		keyData, keyPosition = newKeyData, newKeyPosition
-		chunkKey.ChunkKey(0, keyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
-		if err := chunkKey.Write(indexFD); err != nil {
-			return err, chunkWrited, iframeWrited, last
-		}
-		iframeKey.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
-		if err := iframeKey.Write(indexFD); err != nil {
-			return err, chunkWrited, iframeWrited, last
-		}
-	} else {
-		// если в chunkKey и в iframeKey лежат какие-то данные, попробуем получить keyData
-		newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, int64(chunkKey.SizeBytes))
-		if err != nil {
-			return err, chunkWrited, iframeWrited, last
-		}
-		if uint64(newKeyPosition) != chunkKey.SizeBytes || chunkKey.SizeBytes != iframeKey.SizeBytes {
-			// нужно записать новые ключи
-			chunkKey.ChunkKey(0, newKeyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
+	if vmx != nil {
+		// если мы только открыли index и там нет ключей
+		if chunkKey.Type == hedx.TypeInvalid && iframeKey.Type == hedx.TypeInvalid {
+			// получаем их
+			newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
+			if err != nil {
+				return err, chunkWrited, iframeWrited, last
+			}
+			keyData, keyPosition = newKeyData, newKeyPosition
+			chunkKey.ChunkKey(0, keyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
 			if err := chunkKey.Write(indexFD); err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
-			iframeKey.IFrameKey(0, newKeyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
+			iframeKey.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
 			if err := iframeKey.Write(indexFD); err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
 		} else {
-			keyData = newKeyData
+			// если в chunkKey и в iframeKey лежат какие-то данные, попробуем получить keyData
+			newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, int64(chunkKey.SizeBytes))
+			if err != nil {
+				return err, chunkWrited, iframeWrited, last
+			}
+			if uint64(newKeyPosition) != chunkKey.SizeBytes || chunkKey.SizeBytes != iframeKey.SizeBytes {
+				// нужно записать новые ключи
+				chunkKey.ChunkKey(0, newKeyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
+				if err := chunkKey.Write(indexFD); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
+				iframeKey.IFrameKey(0, newKeyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
+				if err := iframeKey.Write(indexFD); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
+			} else {
+				keyData = newKeyData
+			}
 		}
 	}
 
@@ -112,40 +114,10 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 
 	chunkLength := len(m.chunks)
 
+	m.findAndSaveAbnormal(storageDir)
+
 	// проверяем что дописать по chunks
 	for i, s := range m.chunks {
-
-		// добавляем сообщение об ошибке + скачиваем подозрительные сегменты
-		if i > 1 && m.chunks[i].BeginAt-m.chunks[i-1].BeginAt != 3 {
-			log.Printf("[ERROR] <<<bad chunk>>> %s %s\n", s.ToString(), m.chunks[i-1].ToString())
-			log.Printf("[ERROR] playlist:\n%s\n", m.chunkPlayList.Body)
-			filename := filepath.Join(storageDir, s.URI)
-			http, err := fetchURL(filename, nil)
-			if err == nil {
-				defer http.Close()
-				fd, err := os.OpenFile(s.URI, os.O_RDWR|os.O_CREATE, 0644)
-				if err == nil {
-					defer fd.Close()
-					_, err := io.Copy(fd, http)
-					if err == nil {
-						log.Printf("[ERROR] current bad chunk: %s saved\n", s.URI)
-					}
-				}
-			}
-			http, err = fetchURL(m.chunks[i-1].URL, nil)
-			if err == nil {
-				defer http.Close()
-				filename := filepath.Join(storageDir, m.chunks[i-1].URI)
-				fd, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
-				if err == nil {
-					defer fd.Close()
-					_, err := io.Copy(fd, http)
-					if err == nil {
-						log.Printf("[ERROR] prev bad chunk: %s saved\n", filename)
-					}
-				}
-			}
-		}
 
 		if round(s.BeginAt) > round(float64(m.beginAt)+lastChunk.TimeStampInSec()+0.1) {
 			index := &hedx.Index{}
@@ -157,8 +129,15 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			if err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
-			//writeSize, err := io.Copy(chunkFD, http)
-			writeSize, err := vmx.Crypto(http, chunkFD, keyPosition, keyData)
+
+			// если небходимо пишем с шифрованием
+			var writeSize int64
+			if vmx != nil {
+				writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
+			} else {
+				writeSize, err = io.Copy(iframeFD, http)
+			}
+
 			if err != nil {
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last

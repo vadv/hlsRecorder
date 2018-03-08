@@ -2,6 +2,7 @@ package writer
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -56,18 +57,22 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 	index := &hedx.Index{}
 	headersRange, headers := make(map[string]string, 1), make(map[string]string, 0)
 
-	// должны записать ключи, сначала получаем их
-	keyData, keyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
-	if err != nil {
-		return err
-	}
-	index.ChunkKey(0, keyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
-	if err := index.Write(indexFD); err != nil {
-		return err
-	}
-	index.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
-	if err := index.Write(indexFD); err != nil {
-		return err
+	// если шифруем, то должны записать ключи, сначала получаем их:
+	var keyData []byte
+	var keyPosition int64
+	if vmx != nil {
+		keyData, keyPosition, err = vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
+		if err != nil {
+			return err
+		}
+		index.ChunkKey(0, keyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
+		if err := index.Write(indexFD); err != nil {
+			return err
+		}
+		index.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
+		if err := index.Write(indexFD); err != nil {
+			return err
+		}
 	}
 
 	// сначала записываем chunks
@@ -121,8 +126,15 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 		if err != nil {
 			return err
 		}
-		//writeSize, err := io.Copy(iframeFD, http)
-		writeSize, err := vmx.Crypto(http, iframeFD, keyPosition, keyData)
+
+		// если небходимо пишем с шифрованием
+		var writeSize int64
+		if vmx != nil {
+			writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
+		} else {
+			writeSize, err = io.Copy(iframeFD, http)
+		}
+
 		if err != nil {
 			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 			return err

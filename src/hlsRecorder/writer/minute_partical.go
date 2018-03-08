@@ -133,15 +133,16 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			// если небходимо пишем с шифрованием
 			var writeSize int64
 			if vmx != nil {
-				writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
+				writeSize, err = vmx.Crypto(http, chunkFD, keyPosition, keyData)
 			} else {
-				writeSize, err = io.Copy(iframeFD, http)
+				writeSize, err = io.Copy(chunkFD, http)
 			}
 
 			if err != nil {
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last
 			}
+
 			// обычный CHUNK
 			index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
 			if err := index.Write(indexFD); err != nil {
@@ -190,8 +191,13 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			if err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
-			//writeSize, err := io.Copy(iframeFD, http)
-			writeSize, err := vmx.Crypto(http, iframeFD, keyPosition, keyData)
+			var writeSize int64
+			// если небходимо пишем с шифрованием
+			if vmx != nil {
+				writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
+			} else {
+				writeSize, err = io.Copy(iframeFD, http)
+			}
 			if err != nil {
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last

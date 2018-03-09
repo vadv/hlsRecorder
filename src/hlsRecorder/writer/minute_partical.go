@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	hedx "hlsRecorder/index/hedx"
 	keys "hlsRecorder/keys"
+	stat "hlsRecorder/stat"
 )
 
 func round(f float64) float64 {
@@ -18,7 +20,7 @@ func round(f float64) float64 {
 
 // открываем индексный файл и проверяем последние индексы
 // и записываем все сегменты что больше чем эти последние индексы
-func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.VMX) (error, int64, int64, float64) {
+func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.VMX, channelInfo *stat.ChannelInfo) (error, int64, int64, float64) {
 
 	chunkWrited, iframeWrited, last := int64(0), int64(0), float64(0)
 
@@ -131,12 +133,15 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			}
 
 			// если небходимо пишем с шифрованием
+			startAt := time.Now()
 			var writeSize int64
 			if vmx != nil {
 				writeSize, err = vmx.Crypto(http, chunkFD, keyPosition, keyData)
 			} else {
 				writeSize, err = io.Copy(chunkFD, http)
 			}
+			channelInfo.AddWrite(writeSize)
+			channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
 
 			if err != nil {
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
@@ -191,6 +196,8 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			if err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
+
+			startAt := time.Now()
 			var writeSize int64
 			// если небходимо пишем с шифрованием
 			if vmx != nil {
@@ -198,6 +205,9 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			} else {
 				writeSize, err = io.Copy(iframeFD, http)
 			}
+			channelInfo.AddWrite(writeSize)
+			channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
+
 			if err != nil {
 				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last

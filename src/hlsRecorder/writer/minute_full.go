@@ -6,13 +6,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	hedx "hlsRecorder/index/hedx"
 	keys "hlsRecorder/keys"
+	stat "hlsRecorder/stat"
 )
 
 // переписываем файлы на диске полностью
-func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX) error {
+func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX, channelInfo *stat.ChannelInfo) error {
 
 	if len(m.iframes) == 0 || len(m.chunks) == 0 {
 		return fmt.Errorf("пустая минутка")
@@ -86,12 +88,22 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 		if err != nil {
 			return err
 		}
-		//writeSize, err := io.Copy(chunkFD, http)
-		writeSize, err := vmx.Crypto(http, chunkFD, keyPosition, keyData)
+
+		startAt := time.Now()
+		var writeSize int64
+		if vmx != nil {
+			writeSize, err = vmx.Crypto(http, chunkFD, keyPosition, keyData)
+		} else {
+			writeSize, err = io.Copy(chunkFD, http)
+		}
+		channelInfo.AddWrite(writeSize)
+		channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
+
 		if err != nil {
 			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
 			return err
 		}
+
 		// обычный CHUNK
 		index.Chunk(chunkOffset, writeSize, s.BeginAt-float64(m.beginAt))
 		if err := index.Write(indexFD); err != nil {
@@ -128,12 +140,15 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX)
 		}
 
 		// если небходимо пишем с шифрованием
+		startAt := time.Now()
 		var writeSize int64
 		if vmx != nil {
 			writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
 		} else {
 			writeSize, err = io.Copy(iframeFD, http)
 		}
+		channelInfo.AddWrite(writeSize)
+		channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
 
 		if err != nil {
 			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())

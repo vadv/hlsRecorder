@@ -8,6 +8,7 @@ import (
 
 	keys "hlsRecorder/keys"
 	parser "hlsRecorder/parser"
+	stat "hlsRecorder/stat"
 )
 
 func Stream(stream *parser.Stream, ctx context.Context) {
@@ -16,6 +17,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 	storageDir := (ctx.Value(`path.storage.dir`)).(string)
 	indexDir := (ctx.Value(`path.index.dir`)).(string)
 	deleteOlder := (ctx.Value(`path.delete_older`).(int64))
+	channelInfo := (ctx.Value(`stat.channel_info`).(*stat.ChannelInfo))
 
 	vmx, ok := (ctx.Value(`keys.vmx`)).(*keys.VMX)
 	if !ok {
@@ -53,9 +55,11 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 		// и если надо открываем и скачиваем туда данные
 		for {
 
+			startPlayListAt := time.Now()
 			// обработка главного плейлиста
 			r1, err := fetchURL(mainURI, nil)
 			if err != nil {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s в процессе скачивания chunks-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
@@ -63,6 +67,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			chunkPL, err := parser.ParsePlayList(r1)
 			r1.Close()
 			if err != nil {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s при парсинге chunk-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
@@ -81,6 +86,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			if chunkPL.MediaSeq == prevChunkMediaSEQ {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
+					channelInfo.PlayList.AddError()
 					log.Printf("[ERROR] %s media sequence в chunks не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
@@ -91,6 +97,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			// обработка iframe плейлиста
 			r2, err := fetchURL(iframeURI, nil)
 			if err != nil {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s в процессе скачивания iframe-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
@@ -98,11 +105,13 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			iframePL, err := parser.ParsePlayList(r2)
 			r2.Close()
 			if err != nil {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s при парсинге iframe-плейлиста: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			if !iframePL.IFrame {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s проблема с iframe-плейлистом %s: это не iframe-плейлист\n", stream.Name(), iframeURI)
 			}
 			iframePL.SetURL(iframeURL)
@@ -110,6 +119,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			if iframePL.MediaSeq == prevIframeMediaSEQ {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
+					channelInfo.PlayList.AddError()
 					log.Printf("[ERROR] %s media sequence в iframes не изменился за последние %d попыток\n", stream.Name(), equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
@@ -126,10 +136,12 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 
 			minutes, err := makeMinutes(chunkPL, iframePL)
 			if err != nil {
+				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s при создании плана минуток: %s\n", stream.Name(), err.Error())
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			channelInfo.PlayList.AddTime(time.Now().Sub(startPlayListAt).Seconds())
 
 			lastMinute := minutes.last()
 			for _, min := range minutes.sortedMinuteList() {
@@ -139,14 +151,16 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 					if m.full && m.beginAt != lastMinute.beginAt {
 						// записываем минутку полностью
 						log.Printf("[INFO] %s старт записи полной минуты %d\n", stream.Name(), m.beginAt)
-						if err := m.writeFull(indexDir, storageDir, resource, vmx); err != nil {
+						if err := m.writeFull(indexDir, storageDir, resource, vmx, channelInfo); err != nil {
+							channelInfo.Data.AddError()
 							log.Printf("[ERROR] %s запись полной минуты %d: %s\n", stream.Name(), m.beginAt, err.Error())
 							continue
 						}
 						log.Printf("[INFO] %s успешная запись полной минуты %d\n", stream.Name(), m.beginAt)
 					} else {
-						err, chunks, iframes, last := m.writePartical(indexDir, storageDir, resource, vmx)
+						err, chunks, iframes, last := m.writePartical(indexDir, storageDir, resource, vmx, channelInfo)
 						if err != nil {
+							channelInfo.Data.AddError()
 							log.Printf("[ERROR] %s обработка минуты минуты %d: %s\n", stream.Name(), m.beginAt, err.Error())
 							continue
 						}

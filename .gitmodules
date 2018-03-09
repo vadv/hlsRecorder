@@ -1,3 +1,6 @@
 [submodule "src/vendor/gopkg.in/yaml.v2"]
 	path = src/vendor/gopkg.in/yaml.v2
 	url = https://gopkg.in/yaml.v2
+[submodule "src/vendor/github.com/montanaflynn/stats"]
+	path = src/vendor/github.com/montanaflynn/stats
+	url = https://github.com/montanaflynn/stats.git

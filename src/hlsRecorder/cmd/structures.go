@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+
+	stat "hlsRecorder/stat"
 )
 
 type Config struct {
 	VMXURL      string
 	StoragePath string
 	IndexPath   string
+	GlobalStat  *stat.GlobalStat
 	Channels    map[string][]*Channel
 }
 

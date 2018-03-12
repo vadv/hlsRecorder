@@ -9,15 +9,16 @@ type ChannelInfo struct {
 	WriteBytes int64                `json:"write_bytes"`
 	PlayList   *ChannelDownloadInfo `json:"playlist"`
 	Data       *ChannelDownloadInfo `json:"chunks"`
+	Lag        int64                `json:"lag"`
 }
 
 type ChannelDownloadInfo struct {
 	sync.Mutex
-	list         []float64
-	ErrorCount   int     `json:"error_count"`
-	Percentile75 float64 `json:"percentile_75_ms"`
-	Percentile95 float64 `json:"percentile_95_ms"`
-	Percentile99 float64 `json:"percentile_99_ms"`
+	list           []float64
+	ErrorCount     int     `json:"error_count"`
+	Percentile75ms float64 `json:"percentile_75_ms"`
+	Percentile95ms float64 `json:"percentile_95_ms"`
+	Percentile99ms float64 `json:"percentile_99_ms"`
 }
 
 func newChannelInfo() *ChannelInfo {

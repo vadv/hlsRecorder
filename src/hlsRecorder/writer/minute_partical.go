@@ -252,6 +252,8 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 		return err, chunkWrited, iframeWrited, last
 	}
 
+	channelInfo.Lag = int64(float64(time.Now().Unix()) - last)
+
 	return nil, chunkWrited, iframeWrited, last
 
 }

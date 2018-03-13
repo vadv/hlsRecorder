@@ -9,7 +9,7 @@ type ChannelInfo struct {
 	WriteBytes int64                `json:"write_bytes"`
 	PlayList   *ChannelDownloadInfo `json:"playlist"`
 	Data       *ChannelDownloadInfo `json:"chunks"`
-	Lag        int64                `json:"lag"`
+	Lag        float64              `json:"lag"`
 }
 
 type ChannelDownloadInfo struct {

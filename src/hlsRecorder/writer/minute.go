@@ -36,7 +36,7 @@ func newMinute(t float64) *minute {
 	return &minute{
 		beginAt: getMinute(t),
 		chunks:  make([]*parser.Segment, 0),
-		iframes: make([]*parser.Segment, 0),
+		iframes: nil,
 	}
 }
 

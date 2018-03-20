@@ -17,7 +17,7 @@ func TestSetUrl(t *testing.T) {
 		t.Fatalf("parse error: %s\n", err.Error())
 	}
 
-	if len(pl.Segments) < 3 {
+	if len(pl.Segments) < 4 {
 		t.Fatalf("bad segments: %#v\n", pl.Segments)
 	}
 
@@ -29,17 +29,17 @@ func TestSetUrl(t *testing.T) {
 
 		case 0:
 			if s.URL != `http://server2/i0/1519484820.94-1519484823.94.ts` {
-				t.Errorf("bad URL %#v\n", s)
+				t.Errorf("bad URL, get %s except %s\n", s.URL, `http://server2/i0/1519484820.94-1519484823.94.ts`)
 			}
 
 		case 1:
-			if s.URL != `http://server1/index/0/i1/1519484823.94-1519484826.94.ts` {
-				t.Errorf("bad URL %#v\n", s)
+			if s.URL != `http://server1/i1/1519484823.94-1519484826.94.ts` {
+				t.Errorf("bad URL, get %s except %s\n", s.URL, `http://server1/i1/1519484823.94-1519484826.94.ts`)
 			}
 
 		case 2:
-			if s.URL != `http://server1/index/0/1519484826.94-1519484829.94.ts` {
-				t.Errorf("bad URL %#v\n", s)
+			if s.URL != `http://server1/index/0/i1/1519484823.94-1519484826.94.ts` {
+				t.Errorf("bad URL, get %s except %s\n", s.URL, `http://server1/index/0/i1/1519484823.94-1519484826.94.ts`)
 			}
 
 		}

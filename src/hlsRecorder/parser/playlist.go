@@ -33,7 +33,7 @@ func timeParse(value string) (float64, error) {
 }
 
 // "/.../xx-yy.ts"
-func parseStartEndToFloat(value string) (start float64, end float64, err error) {
+func v1ParseStartEndToFloat(value string) (start float64, end float64, err error) {
 	value = filepath.Base(value)
 	value = strings.TrimSuffix(value, filepath.Ext(value))
 	data := strings.Split(value, `-`)
@@ -46,6 +46,21 @@ func parseStartEndToFloat(value string) (start float64, end float64, err error) 
 		return
 	}
 	end, err = strconv.ParseFloat(data[1], 64)
+	return
+}
+
+// "/.../yy.ts"
+func v2ParseStartEndToFloat(value string) (end float64, err error) {
+	value = filepath.Base(value)
+	value = strings.TrimSuffix(value, filepath.Ext(value))
+	end, err = strconv.ParseFloat(value, 64)
+	if err != nil {
+		return
+	}
+	// MuzTV: 1521475553090.ts
+	if end > 9999999999 && end < 9999999999999 {
+		end = end / 1000
+	}
 	return
 }
 
@@ -131,12 +146,20 @@ func ParsePlayList(r io.ReadCloser) (*PlayList, error) {
 			}
 			if segment.BeginAt == 0 || segment.Duration == 0 {
 				// последний шанс исправить ситуацию
-				start, end, err := parseStartEndToFloat(segment.URI)
+				start, end, err := v1ParseStartEndToFloat(segment.URI)
 				if err == nil {
 					segment.BeginAt = start
 					segment.Duration = end - start
 				} else {
-					return &result, fmt.Errorf("can't found extinf or program date. Parse uri %s: %s", line, err.Error())
+					if segment.Duration == 0 {
+						return &result, fmt.Errorf("can't found extinf or program date. Parse uri %s: %s", line, err.Error())
+					}
+					end, err := v2ParseStartEndToFloat(segment.URI)
+					if err != nil {
+						return &result, fmt.Errorf("can't found extinf or program date. Parse uri %s: %s", line, err.Error())
+					}
+					segment.EndAt = end
+					segment.BeginAt = segment.EndAt - segment.Duration
 				}
 			}
 			if segment.BeginAt == 0 || segment.Duration == 0 {

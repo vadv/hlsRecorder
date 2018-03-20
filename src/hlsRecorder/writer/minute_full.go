@@ -16,7 +16,7 @@ import (
 // переписываем файлы на диске полностью
 func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX, channelInfo *stat.ChannelInfo) error {
 
-	if len(m.iframes) == 0 || len(m.chunks) == 0 {
+	if len(m.chunks) == 0 {
 		return fmt.Errorf("пустая минутка")
 	}
 
@@ -35,15 +35,6 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX,
 	}
 	defer chunkFD.Close()
 	if _, err := chunkFD.Seek(0, 0); err != nil {
-		return err
-	}
-
-	iframeFD, err := os.OpenFile(iframeFile, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer iframeFD.Close()
-	if _, err := iframeFD.Seek(0, 0); err != nil {
 		return err
 	}
 
@@ -71,9 +62,11 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX,
 		if err := index.Write(indexFD); err != nil {
 			return err
 		}
-		index.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
-		if err := index.Write(indexFD); err != nil {
-			return err
+		if m.iframes != nil {
+			index.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
+			if err := index.Write(indexFD); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -128,60 +121,71 @@ func (m *minute) writeFull(indexDir, storageDir, resource string, vmx *keys.VMX,
 	}
 
 	// потом записываем iframes
-	iframeLength, iframeOffset := len(m.iframes), int64(0)
-	for i, s := range m.iframes {
-		if s.ByteRange != nil {
-			headersRange["Range"] = s.ByteRange.Range()
-			headers = headersRange
-		}
-		http, err := fetchURLWithRetry(s.URL, headers, 3)
+	if m.iframes != nil {
+		iframeFD, err := os.OpenFile(iframeFile, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return err
 		}
+		defer iframeFD.Close()
+		if _, err := iframeFD.Seek(0, 0); err != nil {
+			return err
+		}
+		iframeLength, iframeOffset := len(m.iframes), int64(0)
+		for i, s := range m.iframes {
+			if s.ByteRange != nil {
+				headersRange["Range"] = s.ByteRange.Range()
+				headers = headersRange
+			}
+			http, err := fetchURLWithRetry(s.URL, headers, 3)
+			if err != nil {
+				return err
+			}
 
-		// если небходимо пишем с шифрованием
-		startAt := time.Now()
-		var writeSize int64
-		if vmx != nil {
-			writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
-		} else {
-			writeSize, err = io.Copy(iframeFD, http)
-		}
-		channelInfo.AddWrite(writeSize)
-		channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
+			// если небходимо пишем с шифрованием
+			startAt := time.Now()
+			var writeSize int64
+			if vmx != nil {
+				writeSize, err = vmx.Crypto(http, iframeFD, keyPosition, keyData)
+			} else {
+				writeSize, err = io.Copy(iframeFD, http)
+			}
+			channelInfo.AddWrite(writeSize)
+			channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
 
-		if err != nil {
-			log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
-			return err
-		}
-		// записываем IFRAME
-		index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
-		if err := index.Write(indexFD); err != nil {
-			return err
-		}
-		if err := indexFD.Sync(); err != nil {
-			return err
-		}
-		if i == iframeLength-1 {
-			// записываем IFRAME OEF
-			index.IFrameEOF(iframeOffset+writeSize, 0, s.EndAt-float64(m.beginAt))
+			if err != nil {
+				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
+				return err
+			}
+			// записываем IFRAME
+			index.IFrame(iframeOffset, writeSize, s.BeginAt-float64(m.beginAt))
 			if err := index.Write(indexFD); err != nil {
 				return err
 			}
 			if err := indexFD.Sync(); err != nil {
 				return err
 			}
+			if i == iframeLength-1 {
+				// записываем IFRAME OEF
+				index.IFrameEOF(iframeOffset+writeSize, 0, s.EndAt-float64(m.beginAt))
+				if err := index.Write(indexFD); err != nil {
+					return err
+				}
+				if err := indexFD.Sync(); err != nil {
+					return err
+				}
+			}
+			headers = nil
+			iframeOffset = iframeOffset + writeSize
+			http.Close()
 		}
-		headers = nil
-		iframeOffset = iframeOffset + writeSize
-		http.Close()
+
+		if err := iframeFD.Sync(); err != nil {
+			return err
+		}
 	}
 
 	// синкаем все
 	if err := chunkFD.Sync(); err != nil {
-		return err
-	}
-	if err := iframeFD.Sync(); err != nil {
 		return err
 	}
 	if err := indexFD.Sync(); err != nil {

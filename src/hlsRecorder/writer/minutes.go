@@ -18,10 +18,6 @@ func makeMinutes(chunks, iframes *parser.PlayList) (*minutes, error) {
 		return nil, fmt.Errorf("список chunk-сегментов пустой")
 	}
 
-	if len(iframes.Segments) == 0 {
-		return nil, fmt.Errorf("список iframe-сегментов пустой")
-	}
-
 	list := make(map[int64]*minute, 0)
 
 	for _, segment := range chunks.Segments {
@@ -32,13 +28,18 @@ func makeMinutes(chunks, iframes *parser.PlayList) (*minutes, error) {
 		list[at].chunks = append(list[at].chunks, segment)
 	}
 
-	for _, segment := range iframes.Segments {
-		at := getMinute(segment.BeginAt)
-		if _, ok := list[at]; !ok {
-			// iframe-плейлист обгоняет/не догоняет chunks
-			continue
+	if iframes != nil {
+		for _, segment := range iframes.Segments {
+			at := getMinute(segment.BeginAt)
+			if list[at].iframes == nil {
+				list[at].iframes = make([]*parser.Segment, 0)
+			}
+			if _, ok := list[at]; !ok {
+				// iframe-плейлист обгоняет/не догоняет chunks
+				continue
+			}
+			list[at].iframes = append(list[at].iframes, segment)
 		}
-		list[at].iframes = append(list[at].iframes, segment)
 	}
 
 	// первая минута всегда в непонятном статусе,
@@ -56,10 +57,14 @@ func makeMinutes(chunks, iframes *parser.PlayList) (*minutes, error) {
 				break
 			}
 		}
-		for _, segment := range m.iframes {
-			if int64(segment.EndAt) >= m.beginAt+60 {
-				iframeFull = true
-				break
+		if iframes == nil {
+			iframeFull = true
+		} else {
+			for _, segment := range m.iframes {
+				if int64(segment.EndAt) >= m.beginAt+60 {
+					iframeFull = true
+					break
+				}
 			}
 		}
 		m.chunkPlayList = chunks

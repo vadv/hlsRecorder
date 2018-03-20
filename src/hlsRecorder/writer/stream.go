@@ -95,37 +95,40 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			equalMediaSEQCount, prevChunkMediaSEQ = 0, chunkPL.MediaSeq
 
 			// обработка iframe плейлиста
-			r2, err := fetchURL(iframeURI, nil)
-			if err != nil {
-				channelInfo.PlayList.AddError()
-				log.Printf("[ERROR] %s в процессе скачивания iframe-плейлиста: %s\n", stream.Name(), err.Error())
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			iframePL, err := parser.ParsePlayList(r2)
-			r2.Close()
-			if err != nil {
-				channelInfo.PlayList.AddError()
-				log.Printf("[ERROR] %s при парсинге iframe-плейлиста: %s\n", stream.Name(), err.Error())
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			if !iframePL.IFrame {
-				channelInfo.PlayList.AddError()
-				log.Printf("[ERROR] %s проблема с iframe-плейлистом %s: это не iframe-плейлист\n", stream.Name(), iframeURI)
-			}
-			iframePL.SetURL(iframeURL)
-
-			if iframePL.MediaSeq == prevIframeMediaSEQ {
-				equalMediaSEQCount++
-				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
+			var iframePL *parser.PlayList
+			if iframeURI != `` {
+				r2, err := fetchURL(iframeURI, nil)
+				if err != nil {
 					channelInfo.PlayList.AddError()
-					log.Printf("[ERROR] %s media sequence в iframes не изменился за последние %d попыток\n", stream.Name(), equalMediaSEQCount)
+					log.Printf("[ERROR] %s в процессе скачивания iframe-плейлиста: %s\n", stream.Name(), err.Error())
+					time.Sleep(5 * time.Second)
+					continue
 				}
-				time.Sleep(time.Second)
-				continue
+				iframePL, err = parser.ParsePlayList(r2)
+				r2.Close()
+				if err != nil {
+					channelInfo.PlayList.AddError()
+					log.Printf("[ERROR] %s при парсинге iframe-плейлиста: %s\n", stream.Name(), err.Error())
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				if !iframePL.IFrame {
+					channelInfo.PlayList.AddError()
+					log.Printf("[ERROR] %s проблема с iframe-плейлистом %s: это не iframe-плейлист\n", stream.Name(), iframeURI)
+				}
+				iframePL.SetURL(iframeURL)
+
+				if iframePL.MediaSeq == prevIframeMediaSEQ {
+					equalMediaSEQCount++
+					if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
+						channelInfo.PlayList.AddError()
+						log.Printf("[ERROR] %s media sequence в iframes не изменился за последние %d попыток\n", stream.Name(), equalMediaSEQCount)
+					}
+					time.Sleep(time.Second)
+					continue
+				}
+				equalMediaSEQCount, prevIframeMediaSEQ = 0, iframePL.MediaSeq
 			}
-			equalMediaSEQCount, prevIframeMediaSEQ = 0, iframePL.MediaSeq
 
 			/*
 				if iframePL.MediaSeq < chunkPL.MediaSeq {

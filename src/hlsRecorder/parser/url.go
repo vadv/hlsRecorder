@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 )
 
 func isURL(value string) bool {
@@ -15,9 +16,14 @@ func isURL(value string) bool {
 }
 
 // u1 = second.html, u2 = http://ya.ru/first.html => http://ya.ru/second.html
+// u1 = /second/second.html, u2 = http://ya.ru/first/first.html => http://ya.ru/second/second.html
 func joinURL(u1 *url.URL, u2 string) string {
 	u := *u1
-	u.Path = path.Join(path.Dir(u.Path), u2)
+	if strings.HasPrefix(u2, `/`) {
+		return fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u2)
+	} else {
+		u.Path = path.Join(path.Dir(u.Path), u2)
+	}
 	return u.String()
 }
 

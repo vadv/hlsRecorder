@@ -65,7 +65,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 	// разбираемся с ключами
 	if vmx != nil {
 		// если мы только открыли index и там нет ключей
-		if chunkKey.Type == hedx.TypeInvalid && (m.iframes != nil && iframeKey.Type == hedx.TypeInvalid) {
+		if chunkKey.Type == hedx.TypeInvalid && (m.iframes == nil || iframeKey.Type == hedx.TypeInvalid) {
 			// получаем их
 			newKeyData, newKeyPosition, err := vmx.GetKeyPosition(resource, keys.ResourceTypeDTV, m.KeyTime())
 			if err != nil {
@@ -76,9 +76,11 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			if err := chunkKey.Write(indexFD); err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
-			iframeKey.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
-			if err := iframeKey.Write(indexFD); err != nil {
-				return err, chunkWrited, iframeWrited, last
+			if m.iframes != nil {
+				iframeKey.IFrameKey(0, keyPosition, m.iframes[0].BeginAt-float64(m.beginAt))
+				if err := iframeKey.Write(indexFD); err != nil {
+					return err, chunkWrited, iframeWrited, last
+				}
 			}
 		} else {
 			// если в chunkKey и в iframeKey лежат какие-то данные, попробуем получить keyData
@@ -86,6 +88,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			if err != nil {
 				return err, chunkWrited, iframeWrited, last
 			}
+			keyData, keyPosition = newKeyData, newKeyPosition
 			if uint64(newKeyPosition) != chunkKey.SizeBytes || chunkKey.SizeBytes != iframeKey.SizeBytes {
 				// нужно записать новые ключи
 				chunkKey.ChunkKey(0, newKeyPosition, m.chunks[0].BeginAt-float64(m.beginAt))
@@ -98,8 +101,6 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 						return err, chunkWrited, iframeWrited, last
 					}
 				}
-			} else {
-				keyData = newKeyData
 			}
 		}
 	}
@@ -140,7 +141,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 			channelInfo.Data.AddTime(time.Now().Sub(startAt).Seconds())
 
 			if err != nil {
-				log.Printf("[ERROR] при шифровании %s: %s\n", s.ToString(), err.Error())
+				log.Printf("[ERROR] при записи/шифровании %s: %s\n", s.ToString(), err.Error())
 				return err, chunkWrited, iframeWrited, last
 			}
 

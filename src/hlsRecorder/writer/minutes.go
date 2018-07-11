@@ -31,20 +31,22 @@ func makeMinutes(chunks, iframes *parser.PlayList) (*minutes, error) {
 	if iframes != nil {
 		for _, segment := range iframes.Segments {
 			at := getMinute(segment.BeginAt)
-			if list[at].iframes == nil {
-				list[at].iframes = make([]*parser.Segment, 0)
-			}
 			if _, ok := list[at]; !ok {
 				// iframe-плейлист обгоняет/не догоняет chunks
 				continue
+			}
+			if list[at].iframes == nil {
+				list[at].iframes = make([]*parser.Segment, 0)
 			}
 			list[at].iframes = append(list[at].iframes, segment)
 		}
 	}
 
 	// первая минута всегда в непонятном статусе,
-	// поэтому мы просто ее удаляем
-	delete(list, getMinute(chunks.Segments[0].BeginAt))
+	// поэтому мы просто ее удаляем, если она не единственная
+	if len(list) != 1 {
+		delete(list, getMinute(chunks.Segments[0].BeginAt))
+	}
 	if len(list) == 0 {
 		return nil, fmt.Errorf("не одной целой минуты")
 	}

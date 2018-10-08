@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	yaml "gopkg.in/yaml.v2"
@@ -62,6 +63,9 @@ func channelConfigParser(filename string) (map[string][]*Channel, error) {
 	for resource, settings := range maps {
 		result[resource] = make([]*Channel, 0)
 		for dirName, bw := range settings.Bandwidths {
+			if len(settings.Hosts) == 0 {
+				return nil, fmt.Errorf("пустой список хостов для: %s", dirName)
+			}
 			channel := &Channel{
 				UseVMX:      settings.VMX,
 				DeleteOlder: settings.RotateHours * 60 * 60,

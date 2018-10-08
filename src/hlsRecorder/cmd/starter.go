@@ -28,6 +28,7 @@ func (c *Channel) Start(vmx *keys.VMX, stat *stat.GlobalStat) {
 
 	writer.Stream(&parser.Stream{
 		LogName:   fmt.Sprintf("%s/%s", c.Resource, c.BW),
+		Hosts:     c.Stream.Hosts,
 		MainURI:   c.Stream.MainURI,
 		IFrameURI: c.Stream.IFrameURI,
 	}, ctx)

@@ -27,9 +27,13 @@ func joinURL(u1 *url.URL, u2 string) string {
 	return u.String()
 }
 
-func (i *Index) SetURL(u *url.URL) error {
+func (i *Index) SetURL(rawurl string) error {
 	if i.Streams == nil {
 		return fmt.Errorf("empty streams info")
+	}
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return err
 	}
 	for _, s := range i.Streams {
 		if s.IFrameURI != `` && !isURL(s.IFrameURI) {
@@ -42,9 +46,13 @@ func (i *Index) SetURL(u *url.URL) error {
 	return nil
 }
 
-func (p *PlayList) SetURL(u *url.URL) error {
+func (p *PlayList) SetURL(rawurl string) error {
 	if p.Segments == nil {
 		return fmt.Errorf("empty segments info")
+	}
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return err
 	}
 	for _, s := range p.Segments {
 		if !isURL(s.URI) {

@@ -28,4 +28,5 @@ type Channel struct {
 type Stream struct {
 	MainURI   string
 	IFrameURI string
+	Hosts     []string
 }

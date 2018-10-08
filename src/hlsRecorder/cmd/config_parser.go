@@ -13,22 +13,24 @@ import (
 CH_TV1HDREC:
   vmx: true
   rotate_hours: 72
+  hosts:
+  - http://192.168.185.148
   bandwidths:
     bw700000:
-     chunks:  http://192.168.185.148/indextest/0/chunklist.m3u8
-     iframes: http://192.168.185.148/indextest/0/iframe_chunklist.m3u8
+     chunks:  /indextest/0/chunklist.m3u8
+     iframes: /indextest/0/iframe_chunklist.m3u8
     bw1500000:
-     chunks:  http://192.168.185.148/indextest/1/chunklist.m3u8
-     iframes: http://192.168.185.148/indextest/1/iframe_chunklist.m3u8
+     chunks:  /indextest/1/chunklist.m3u8
+     iframes: /indextest/1/iframe_chunklist.m3u8
     bw2000000:
-     chunks:  http://192.168.185.148/indextest/2/chunklist.m3u8
-     iframes: http://192.168.185.148/indextest/2/iframe_chunklist.m3u8
+     chunks:  /indextest/2/chunklist.m3u8
+     iframes: /indextest/2/iframe_chunklist.m3u8
     bw4000000:
-     chunks:  http://192.168.185.148/indextest/3/chunklist.m3u8
-     iframes: http://192.168.185.148/indextest/3/iframe_chunklist.m3u8
+     chunks:  /indextest/3/chunklist.m3u8
+     iframes: /indextest/3/iframe_chunklist.m3u8
     bw5000000:
-     chunks:  http://192.168.185.148/indextest/4/chunklist.m3u8
-     iframes: http://192.168.185.148/indextest/4/iframe_chunklist.m3u8
+     chunks:  /indextest/4/chunklist.m3u8
+     iframes: /indextest/4/iframe_chunklist.m3u8
 
 */
 
@@ -43,6 +45,7 @@ func channelConfigParser(filename string) (map[string][]*Channel, error) {
 		VMX         bool             `yaml:"vmx"`
 		RotateHours int64            `yaml:"rotate_hours"`
 		Bandwidths  map[string]*Urls `yaml:"bandwidths"`
+		Hosts       []string         `yaml:"hosts"`
 	}
 
 	data, err := ioutil.ReadFile(filename)
@@ -65,6 +68,7 @@ func channelConfigParser(filename string) (map[string][]*Channel, error) {
 				Resource:    resource,
 				BW:          dirName,
 				Stream: Stream{
+					Hosts:     settings.Hosts,
 					MainURI:   bw.Chunks,
 					IFrameURI: bw.IFrames,
 				},

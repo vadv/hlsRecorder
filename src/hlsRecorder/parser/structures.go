@@ -1,17 +1,23 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type Index struct {
 	Streams []*Stream
 }
 
 type Stream struct {
+	sync.Mutex
 	LogName       string
 	Resolution    string
 	MainBandwidth string
 	MainURI       string
 	IFrameURI     string
+	Hosts         []string
+	CurrentHost   string
 }
 
 func (s *Stream) Name() string {
@@ -19,11 +25,12 @@ func (s *Stream) Name() string {
 }
 
 type PlayList struct {
-	URI      string
-	MediaSeq int64
-	IFrame   bool
-	Segments []*Segment
-	Body     string
+	URI           string
+	MediaSeq      int64
+	IFrame        bool
+	Segments      []*Segment
+	Body          string
+	SourceChanged bool
 }
 
 type Segment struct {

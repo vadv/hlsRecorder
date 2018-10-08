@@ -3,7 +3,6 @@ package writer
 import (
 	"context"
 	"log"
-	"net/url"
 	"time"
 
 	keys "hlsRecorder/keys"
@@ -26,14 +25,6 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 	}
 
 	mainURI, iframeURI := stream.MainURI, stream.IFrameURI
-	mainURL, errMainURL := url.Parse(stream.MainURI)
-	iframeURL, errIFrameURL := url.Parse(stream.IFrameURI)
-	if errMainURL != nil {
-		panic(errMainURL)
-	}
-	if errIFrameURL != nil {
-		panic(errIFrameURL)
-	}
 
 	go runJunitor(storageDir, deleteOlder)
 	go runJunitor(indexDir, deleteOlder)
@@ -57,7 +48,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 
 			startPlayListAt := time.Now()
 			// обработка главного плейлиста
-			r1, err := fetchURL(mainURI, nil)
+			r1, err, changed, currentURL := fetchStreamUrlWithAlternativeHosts(mainURI, stream, nil, 1)
 			if err != nil {
 				channelInfo.PlayList.AddError()
 				log.Printf("[ERROR] %s в процессе скачивания chunks-плейлиста: %s\n", stream.Name(), err.Error())
@@ -72,7 +63,9 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			chunkPL.SetURL(mainURL)
+			// нужно обновить плейлист до chunks с абсолютным значением
+			chunkPL.SourceChanged = changed
+			chunkPL.SetURL(currentURL)
 
 			/*
 				// MediaSeq в памяти транскодера - поэтому мы не можем на него орентироваться
@@ -87,7 +80,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 				equalMediaSEQCount++
 				if equalMediaSEQCount > 10 && equalMediaSEQCount%5 == 0 {
 					channelInfo.PlayList.AddError()
-					log.Printf("[ERROR] %s media sequence в chunks не изменился за последние %d попыток\n", mainURI, equalMediaSEQCount)
+					log.Printf("[ERROR] %s media sequence в chunks не изменился за последние %d попыток\n", stream.Name(), equalMediaSEQCount)
 				}
 				time.Sleep(time.Second)
 				continue
@@ -97,7 +90,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 			// обработка iframe плейлиста
 			var iframePL *parser.PlayList
 			if iframeURI != `` {
-				r2, err := fetchURL(iframeURI, nil)
+				r2, err, changed, currentURL := fetchStreamUrlWithAlternativeHosts(iframeURI, stream, nil, 1)
 				if err != nil {
 					channelInfo.PlayList.AddError()
 					log.Printf("[ERROR] %s в процессе скачивания iframe-плейлиста: %s\n", stream.Name(), err.Error())
@@ -116,7 +109,9 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 					channelInfo.PlayList.AddError()
 					log.Printf("[ERROR] %s проблема с iframe-плейлистом %s: это не iframe-плейлист\n", stream.Name(), iframeURI)
 				}
-				iframePL.SetURL(iframeURL)
+				// нужно обновить плейлист до iframe с абсолютным значением
+				iframePL.SourceChanged = changed
+				iframePL.SetURL(currentURL)
 
 				if iframePL.MediaSeq == prevIframeMediaSEQ {
 					equalMediaSEQCount++

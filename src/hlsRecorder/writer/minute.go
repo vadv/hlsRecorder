@@ -2,11 +2,10 @@ package writer
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-
 	hedx "hlsRecorder/index/hedx"
 	parser "hlsRecorder/parser"
+	"os"
+	"path/filepath"
 )
 
 // сущность - набор сегментом которые необходимо записать на диск
@@ -64,5 +63,5 @@ func (m *minute) indexHasEOF(indexDir string) bool {
 
 // ротейшен полиси ключа
 func (m *minute) KeyTime() int64 {
-	return (m.beginAt - (m.beginAt % (60 * 15))) // раз в 15 минут
+	return (m.beginAt - (m.beginAt % (60 * 60 * 24))) // раз в день
 }

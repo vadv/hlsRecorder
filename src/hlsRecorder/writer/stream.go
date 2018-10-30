@@ -162,7 +162,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 							continue
 						}
 						if chunks+iframes > 0 {
-							log.Printf("[DEBUG] %s обработка минуты %d было записано: [chunks:%d iframes:%d lag:%.2f]",
+							log.Printf("[DEBUG] %s обработка минуты %d было записано: [chunks:%d iframes:%d lag:%.2f]\n",
 								stream.Name(), m.beginAt, chunks, iframes, (float64(time.Now().UnixNano())/float64(time.Second))-last)
 						}
 					}
@@ -179,7 +179,7 @@ func Stream(stream *parser.Stream, ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		log.Printf("[INFO] stop process playlist `%s` \n", stream.MainURI)
+		log.Printf("[INFO] остановка записи playlist'а `%s` \n", stream.MainURI)
 		wasStopped = true
 		return
 	}

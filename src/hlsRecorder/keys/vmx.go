@@ -23,6 +23,13 @@ type VMX struct {
 	lastPositionByResource map[string]int64
 }
 
+func (v *VMX) getUrl() url.URL {
+	v.Lock()
+	defer v.Unlock()
+	result := *v.url
+	return result
+}
+
 // https://vmxott.svc.iptv.rt.ru/CAB/keyfile
 func New(rawurl string) *VMX {
 	u, err := url.Parse(rawurl)

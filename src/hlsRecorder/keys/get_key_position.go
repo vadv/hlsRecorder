@@ -17,7 +17,8 @@ func (k *VMX) getUnsafeKeyPosition(r string) ([]byte, int64, error) {
 
 // скачивает и возвращает ключ
 func (k *VMX) GetKeyPosition(r string, t resourceType, p int64) ([]byte, int64, error) {
-	u := k.url
+
+	u := k.getUrl()
 	q := u.Query()
 	q.Set(`r`, r)
 	q.Set(`p`, fmt.Sprintf("%d", p))
@@ -26,11 +27,11 @@ func (k *VMX) GetKeyPosition(r string, t resourceType, p int64) ([]byte, int64, 
 
 	// блокируем на чтение
 	k.RLock()
-	// нашлось в кэше
+	// проверим что нашлось в кэше
 	result, ok := k.keyByURL[u.String()]
 	k.RUnlock()
+
 	if ok {
-		log.Printf("[DEBUG] {vmx:%s:%d} ключ из кэша\n", r, p)
 		return result, p, nil
 	}
 

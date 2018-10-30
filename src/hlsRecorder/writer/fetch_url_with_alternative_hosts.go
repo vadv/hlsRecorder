@@ -2,10 +2,9 @@ package writer
 
 import (
 	"fmt"
+	parser "hlsRecorder/parser"
 	"io"
 	"log"
-
-	parser "hlsRecorder/parser"
 )
 
 /* закачка url со списком альтернативных источников

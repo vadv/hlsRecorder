@@ -2,12 +2,11 @@ package writer
 
 import (
 	"context"
-	"log"
-	"time"
-
 	keys "hlsRecorder/keys"
 	parser "hlsRecorder/parser"
 	stat "hlsRecorder/stat"
+	"log"
+	"time"
 )
 
 func Stream(stream *parser.Stream, ctx context.Context) {

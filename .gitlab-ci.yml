@@ -1,19 +1,38 @@
-image: vadv/centos-6-go:1.11.2
-
 types:
 - build
 
 cache:
   untracked: false
 
-rpm:
+rpm_6:
 
+  image: vadv/centos-6-go:1.11.2
   type: build
 
   script:
   - make docker
   - rsync -aP /build/RPMS/x86_64/*.rpm rsync://repo.itv.restr.im/infra/6/x86_64/
   - curl http://repo.itv.restr.im/update?repo=infra/6/x86_64
+
+  artifacts:
+    paths:
+    - /build/RPMS/x86_64/*.rpm
+
+  tags:
+  - lowcapacity
+
+  only:
+  - tags
+
+rpm_7:
+
+  image: vadv/centos-7-go:1.11.2
+  type: build
+
+  script:
+  - make docker
+  - rsync -aP /build/RPMS/x86_64/*.rpm rsync://repo.itv.restr.im/infra/7/x86_64/
+  - curl http://repo.itv.restr.im/update?repo=infra/7/x86_64
 
   artifacts:
     paths:

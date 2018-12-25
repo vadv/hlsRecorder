@@ -115,7 +115,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 
 	m.findAndSaveAbnormal(storageDir)
 
-	lastChunkTs, isFirstChunk := float64(m.beginAt)+lastChunk.TimeStampInSec(), (lastChunk.TimeStampUsec == 0)
+	lastChunkTs, isFirstChunk := float64(m.beginAt)+lastChunk.TimeStampInSec(), (lastChunk.Type == hedx.TypeInvalid)
 
 	// проверяем что дописать по chunks
 	for i, s := range m.chunks {
@@ -123,7 +123,7 @@ func (m *minute) writePartical(indexDir, storageDir, resource string, vmx *keys.
 		// определяем что чанк необходимо дописать
 		if round(s.BeginAt) > round(lastChunkTs+0.1) ||
 			// если первый чанк в минуте
-			(isFirstChunk && int64(s.BeginAt)+1 > int64(lastChunkTs)) {
+			(isFirstChunk && int64(s.BeginAt) >= int64(lastChunkTs)) {
 			lastChunkTs, isFirstChunk = s.BeginAt, false
 			index := &hedx.Index{}
 			if s.ByteRange != nil {
